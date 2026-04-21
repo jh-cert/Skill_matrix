@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skill Matrix</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f4f8; color: #1a2a3a; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: #003580; color: #fff;
+      padding: 0 32px; display: flex; align-items: center;
+      justify-content: space-between; height: 56px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px; }
+    .subtitle { font-size: 0.8rem; opacity: 0.7; }
+    .version-badge {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.3px;
+      background: rgba(255,255,255,0.18); padding: 2px 9px;
+      border-radius: 3px; margin-left: 10px; opacity: 0.9;
+    }
+
+    .nav-tabs { display: flex; height: 100%; }
+    .nav-tab {
+      height: 56px; padding: 0 24px; border: none;
+      border-bottom: 3px solid transparent;
+      background: none; color: rgba(255,255,255,0.7);
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .nav-tab:hover { color: #fff; }
+    .nav-tab.active { color: #fff; border-bottom-color: #fff; }
+
+    /* ── Controls bar ── */
+    .controls {
+      background: #fff; border-bottom: 2px solid #003580;
+      padding: 14px 32px; display: flex; align-items: center;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .controls-divider { width: 1px; height: 38px; background: #d0dce8; margin: 0 4px; }
+    .control-group { display: flex; flex-direction: column; gap: 4px; }
+    .control-group label {
+      font-size: 0.72rem; font-weight: 700; color: #003580;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    select {
+      height: 38px; padding: 0 12px;
+      border: 2px solid #003580; border-radius: 4px;
+      font-size: 0.9rem; color: #1a2a3a; background: #fff;
+      min-width: 200px; cursor: pointer;
+    }
+    select:focus { outline: none; border-color: #0055b3; }
+
+    .type-buttons { display: flex; gap: 6px; }
+    .type-btn {
+      height: 38px; padding: 0 18px;
+      border: 2px solid #003580; border-radius: 4px;
+      background: #fff; color: #003580;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .type-btn:hover { background: #e8f0fc; }
+    .type-btn.active { background: #003580; color: #fff; }
+
+    /* ── Main ── */
+    main { padding: 24px 32px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .status-bar { font-size: 0.85rem; color: #555; margin-bottom: 12px; min-height: 20px; }
+
+    /* ── Table ── */
+    .table-wrapper {
+      background: #fff; border: 1px solid #c8d8e8;
+      border-radius: 6px; overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: #003580; color: #fff; position: sticky; top: 0; z-index: 1; }
+    thead th { padding: 10px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
+    thead th.center { text-align: center; }
+    tbody tr { border-bottom: 1px solid #e4eaf2; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f0f6ff; }
+    td { padding: 9px 14px; vertical-align: middle; }
+    td.subject { max-width: 320px; }
+    td.reg-act { max-width: 260px; color: #444; font-size: 0.8rem; }
+    td.center { text-align: center; }
+
+    /* ── Level badge ── */
+    .level-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 36px; height: 28px; padding: 0 8px;
+      border-radius: 4px; font-weight: 700; font-size: 0.9rem;
+    }
+    .level-0  { background: #f0f0f0; color: #888; border: 1px solid #ddd; }
+    .level-1  { background: #ddeeff; color: #003580; border: 1px solid #b0ccf0; }
+    .level-2  { background: #bbdcff; color: #003580; border: 1px solid #80b8f0; }
+    .level-3  { background: #88bfff; color: #fff; }
+    .level-4  { background: #0055b3; color: #fff; }
+    .level-5  { background: #003580; color: #fff; }
+    .level-sp { background: #001d4a; color: #fff; }
+
+    /* ── Buttons ── */
+    .hist-btn {
+      padding: 4px 12px; border: 1.5px solid #003580; border-radius: 4px;
+      background: #fff; color: #003580; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+    }
+    .hist-btn:hover { background: #003580; color: #fff; }
+    .btn-primary {
+      height: 40px; padding: 0 24px; background: #003580; color: #fff;
+      border: none; border-radius: 4px; font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #0055b3; }
+    .btn-primary:disabled { opacity: 0.5; cursor: default; }
+    .btn-danger {
+      height: 40px; padding: 0 24px; background: #fff; color: #c00;
+      border: 2px solid #c00; border-radius: 4px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-danger:hover { background: #c00; color: #fff; }
+    .btn-danger:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,30,80,0.5); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 8px; width: 680px;
+      max-width: 95vw; max-height: 80vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .modal-header {
+      background: #003580; color: #fff; padding: 14px 20px;
+      border-radius: 8px 8px 0 0;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    }
+    .modal-header h2 { font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
+    .modal-close {
+      background: none; border: none; color: #fff;
+      font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 0; flex-shrink: 0;
+    }
+    .modal-close:hover { opacity: 0.7; }
+    .modal-body { padding: 20px; overflow-y: auto; }
+    .modal-meta { font-size: 0.8rem; color: #555; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #e4eaf2; }
+    .modal-meta strong { color: #003580; }
+    .modal table { font-size: 0.85rem; }
+    .modal thead { background: #003580; }
+    .modal tbody tr:hover { background: #f0f6ff; }
+    .no-history { text-align: center; color: #888; padding: 24px; font-size: 0.9rem; }
+
+    /* ── State messages ── */
+    .state-msg { padding: 40px; text-align: center; color: #888; font-size: 0.95rem; }
+    .setup-banner {
+      display: none; background: #fff3cd; border: 2px solid #e5a000;
+      border-radius: 6px; padding: 14px 18px; margin-bottom: 16px;
+      font-size: 0.875rem; line-height: 1.7;
+    }
+    .setup-banner.visible { display: block; }
+    .setup-banner b { color: #003580; }
+    .setup-banner ol { padding-left: 20px; margin-top: 4px; }
+    .setup-banner code { background: #eee; padding: 1px 5px; border-radius: 3px; font-family: monospace; }
+
+    /* ── INPUT PAGE ── */
+    .input-page { max-width: 720px; }
+    .input-card { background: #fff; border: 1px solid #c8d8e8; border-radius: 8px; margin-bottom: 24px; overflow: hidden; }
+    .input-card-header {
+      background: #003580; color: #fff; padding: 12px 20px;
+      font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    }
+    .input-card-header.danger { background: #9a0000; }
+    .input-card-body { padding: 20px; }
+
+    .form-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+    .form-group label {
+      font-size: 0.75rem; font-weight: 700; color: #003580;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .form-input {
+      height: 40px; padding: 0 12px; border: 2px solid #c8d8e8; border-radius: 4px;
+      font-size: 0.9rem; color: #1a2a3a; background: #fff; width: 100%;
+    }
+    .form-input:focus { outline: none; border-color: #003580; }
+    .form-select {
+      height: 40px; padding: 0 12px; border: 2px solid #c8d8e8; border-radius: 4px;
+      font-size: 0.88rem; color: #1a2a3a; background: #fff; width: 100%; cursor: pointer;
+    }
+    .form-select:focus { outline: none; border-color: #003580; }
+
+    /* Delete warning */
+    .delete-warning {
+      background: #fff5f5; border: 1px solid #ffcccc; border-radius: 6px;
+      padding: 10px 14px; font-size: 0.82rem; color: #800;
+      margin-top: 12px; display: none;
+    }
+    .delete-warning.visible { display: block; }
+
+    /* Level UI */
+    .level-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .level-label { font-size: 0.75rem; font-weight: 700; color: #003580; text-transform: uppercase; letter-spacing: 0.5px; min-width: 110px; }
+    .level-current-box {
+      display: flex; align-items: center; gap: 8px;
+      background: #f0f4f8; border: 1px solid #c8d8e8;
+      border-radius: 6px; padding: 8px 14px;
+    }
+    .level-arrow { font-size: 1.1rem; color: #003580; font-weight: 700; }
+    .level-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .lvl-btn {
+      width: 44px; height: 44px; border: 2px solid #c8d8e8; border-radius: 6px;
+      background: #fff; color: #555; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      transition: all 0.12s;
+    }
+    .lvl-btn:hover:not(:disabled) { border-color: #003580; color: #003580; background: #e8f0fc; }
+    .lvl-btn.selected { background: #003580; color: #fff; border-color: #003580; }
+    .lvl-btn.achieved { border-color: #0055b3; color: #0055b3; background: #ddeeff; }
+    .lvl-btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* Date picker */
+    .date-input-wrap { position: relative; }
+    .date-display {
+      height: 40px; padding: 0 12px; border: 2px solid #c8d8e8; border-radius: 4px;
+      font-size: 0.9rem; color: #1a2a3a; background: #fff; width: 100%; cursor: pointer;
+      text-align: left; display: flex; align-items: center; justify-content: space-between;
+    }
+    .date-display:hover { border-color: #003580; }
+    .date-display .cal-icon { color: #003580; }
+    .calendar-popup {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0;
+      background: #fff; border: 2px solid #003580; border-radius: 8px;
+      z-index: 200; width: 280px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .calendar-popup.open { display: block; }
+    .cal-header {
+      background: #003580; color: #fff; padding: 10px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-radius: 6px 6px 0 0;
+    }
+    .cal-header span { font-weight: 700; font-size: 0.9rem; }
+    .cal-nav { background: none; border: none; color: #fff; font-size: 1.1rem; cursor: pointer; padding: 2px 8px; }
+    .cal-nav:hover { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    .cal-grid { padding: 8px; }
+    .cal-weekdays { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 4px; }
+    .cal-weekdays span { text-align: center; font-size: 0.72rem; font-weight: 700; color: #003580; padding: 4px 0; }
+    .cal-days { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+    .cal-day {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; border-radius: 50%; cursor: pointer; border: none; background: none;
+    }
+    .cal-day:hover:not(.empty) { background: #e8f0fc; color: #003580; }
+    .cal-day.other-month { color: #ccc; }
+    .cal-day.today { font-weight: 700; color: #003580; border: 1.5px solid #003580; }
+    .cal-day.selected { background: #003580; color: #fff; font-weight: 700; }
+    .cal-day.empty { cursor: default; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 6px;
+      font-size: 0.88rem; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      opacity: 0; transform: translateY(8px);
+      transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #003580; color: #fff; }
+    .toast.error { background: #cc2200; color: #fff; }
+
+    .form-divider { border: none; border-top: 1px solid #e4eaf2; margin: 16px 0; }
+
+    /* Regulation view select */
+    #viewRegGroup { display: none; }
+    #viewRegSelect { min-width: 320px; }
+
+    /* ── Search input ── */
+    .search-wrap { position: relative; }
+    .search-input {
+      height: 38px; padding: 0 12px 0 32px;
+      border: 2px solid #003580; border-radius: 4px;
+      font-size: 0.88rem; color: #1a2a3a; background: #fff;
+      min-width: 180px;
+    }
+    .search-input:focus { outline: none; border-color: #0055b3; }
+    .search-icon {
+      position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+      font-size: 0.85rem; pointer-events: none; color: #003580;
+    }
+
+    /* ── Upload button ── */
+    .btn-upload {
+      height: 38px; padding: 0 16px;
+      background: #fff; color: #003580;
+      border: 2px solid #003580; border-radius: 4px;
+      font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      white-space: nowrap; transition: background 0.15s, color 0.15s;
+    }
+    .btn-upload:hover { background: #003580; color: #fff; }
+    .btn-upload:disabled { opacity: 0.4; cursor: default; }
+
+
+    /* ── Upload progress modal ── */
+    .upload-step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; font-size: 0.88rem; border-bottom: 1px solid #f0f0f0;
+    }
+    .upload-step:last-child { border-bottom: none; }
+    .upload-step .step-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+    .upload-step .step-text { flex: 1; color: #444; }
+    .upload-step.done .step-text { color: #1a2a3a; font-weight: 600; }
+    .upload-step.active .step-text { color: #003580; }
+    .upload-result {
+      margin-top: 16px; padding: 12px 14px;
+      background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px;
+      font-size: 0.85rem; line-height: 1.7; color: #1a3a1a;
+    }
+
+    /* ── Stats page ── */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr));
+      gap: 16px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #fff; border: 1px solid #c8d8e8; border-radius: 8px;
+      padding: 20px 16px; text-align: center;
+    }
+    .stat-card .stat-num { font-size: 2rem; font-weight: 700; color: #003580; line-height: 1.1; }
+    .stat-card .stat-lbl { font-size: 0.75rem; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stats-section { background: #fff; border: 1px solid #c8d8e8; border-radius: 8px; overflow: hidden; }
+    .stats-section-hdr {
+      background: #003580; color: #fff; padding: 10px 16px;
+      font-size: 0.88rem; font-weight: 700;
+    }
+    .qual-cell { min-width: 120px; }
+    .qual-bar-wrap { display: flex; align-items: center; gap: 6px; }
+    .qual-bar-bg { flex: 1; height: 7px; background: #e4eaf2; border-radius: 4px; min-width: 50px; }
+    .qual-bar-fill { height: 7px; background: #003580; border-radius: 4px; transition: width 0.3s; }
+    .qual-pct { font-size: 0.72rem; color: #555; white-space: nowrap; min-width: 38px; text-align: right; }
+    .stats-person-link { color: #003580; cursor: pointer; font-weight: 600; text-decoration: underline dotted; }
+    .stats-person-link:hover { color: #0055b3; }
+
+    /* ── History delete button ── */
+    .hist-del-btn {
+      padding: 2px 7px; border: 1.5px solid #c00; border-radius: 3px;
+      background: #fff; color: #c00; font-size: 0.72rem; font-weight: 700;
+      cursor: pointer; line-height: 1.4;
+    }
+    .hist-del-btn:hover { background: #c00; color: #fff; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="header-left">
+    <div>
+      <h1>Skill Matrix</h1>
+      <span class="subtitle">ATBS Type Approval Competence Tracker</span>
+    </div>
+    <span id="fileVersion" class="version-badge"></span>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('view')">📋 View</button>
+    <button class="nav-tab" onclick="showPage('stats')">📊 Stats</button>
+  </nav>
+</header>
+
+<!-- ── View Controls ── -->
+<div class="controls" id="viewControls">
+
+  <!-- Mode toggle -->
+  <div class="control-group">
+    <label>View Mode</label>
+    <div class="type-buttons">
+      <button class="type-btn active" id="modePersonBtn" onclick="switchViewMode('person')">By Person</button>
+      <button class="type-btn" id="modeRegBtn" onclick="switchViewMode('regulation')">By Regulation</button>
+    </div>
+  </div>
+
+  <div class="controls-divider"></div>
+
+  <!-- Person selector (By Person mode) -->
+  <div class="control-group" id="viewPersonGroup">
+    <label>Person</label>
+    <select id="personSelect">
+      <option value="">— Select —</option>
+    </select>
+  </div>
+
+  <!-- Vehicle Type (both modes) -->
+  <div class="control-group">
+    <label>Vehicle Type</label>
+    <div class="type-buttons">
+      <button class="type-btn active" data-type="car">Vehicle</button>
+      <button class="type-btn" data-type="tractor">Tractor</button>
+      <button class="type-btn" data-type="motorcycle">Motorcycle</button>
+    </div>
+  </div>
+
+  <!-- Regulation selector (By Regulation mode) -->
+  <div class="control-group" id="viewRegGroup">
+    <label>Regulation</label>
+    <select id="viewRegSelect" onchange="onViewRegChange()">
+      <option value="">— Select a regulation —</option>
+    </select>
+  </div>
+
+  <div class="controls-divider"></div>
+
+  <!-- Search -->
+  <div class="control-group">
+    <label>Search</label>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" class="search-input"
+        placeholder="person, regulation 입력" oninput="onSearchInput()" />
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="control-group">
+    <label>&nbsp;</label>
+    <button class="btn-upload" onclick="uploadExcel()">⬆ Upload Excel</button>
+    <input type="file" id="excelFileInput" accept=".xlsx" style="display:none"
+      onchange="handleFileSelect(event)" />
+  </div>
+
+</div>
+
+<!-- ── Pages ── -->
+<main>
+
+  <!-- VIEW PAGE -->
+  <div id="viewPage" class="page active">
+    <div class="setup-banner" id="setupBanner">
+      <b>No data found.</b> Click <b>⬆ Upload Excel</b> to import data.
+    </div>
+    <div class="status-bar" id="statusBar"></div>
+    <div class="table-wrapper" id="tableWrapper">
+      <div class="state-msg">Select a person or regulation to view skill levels.</div>
+    </div>
+  </div>
+
+  <!-- INPUT PAGE (removed) -->
+  <div id="inputPage" class="page" style="display:none!important">
+    <div class="input-page">
+
+      <!-- Card 1: Add New Person -->
+      <div class="input-card">
+        <div class="input-card-header">👤 Add New Person</div>
+        <div class="input-card-body">
+          <div class="form-row" style="align-items:flex-end">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" id="newPersonName" class="form-input" placeholder="e.g. John Smith" />
+            </div>
+            <button class="btn-primary" onclick="submitNewPerson()" style="flex-shrink:0">Add Person</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Delete Person -->
+      <div class="input-card">
+        <div class="input-card-header danger">🗑 Remove Person (Resigned)</div>
+        <div class="input-card-body">
+          <div class="form-row" style="align-items:flex-end">
+            <div class="form-group">
+              <label>Select Person to Remove</label>
+              <select id="deletePersonSelect" class="form-select" onchange="onDeletePersonChange()">
+                <option value="">— Select Person —</option>
+              </select>
+            </div>
+            <button class="btn-danger" id="deletePersonBtn" onclick="confirmDeletePerson()" style="flex-shrink:0" disabled>
+              Delete Person
+            </button>
+          </div>
+          <div class="delete-warning" id="deleteWarning">
+            ⚠ This will permanently delete <strong id="deletePersonName"></strong> and all their skill records (levels + history). This action cannot be undone.
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Record Skill Level -->
+      <div class="input-card">
+        <div class="input-card-header">🎯 Record Skill Achievement</div>
+        <div class="input-card-body">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Person</label>
+              <select id="inputPersonSelect" class="form-select" onchange="onInputPersonChange()">
+                <option value="">— Select Person —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Vehicle Type</label>
+              <select id="inputTypeSelect" class="form-select" onchange="onInputTypeChange()">
+                <option value="car">Vehicle (Car)</option>
+                <option value="tractor">Tractor</option>
+                <option value="motorcycle">Motorcycle</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:16px">
+            <label>Regulation</label>
+            <select id="inputRegSelect" class="form-select" onchange="onInputRegChange()">
+              <option value="">— Select a regulation —</option>
+            </select>
+          </div>
+
+          <hr class="form-divider" />
+
+          <div class="level-row">
+            <span class="level-label">Current Level</span>
+            <div class="level-current-box">
+              <span class="level-badge level-0" id="currentLevelBadge">—</span>
+              <span style="font-size:0.8rem;color:#555" id="currentLevelDesc">Select a regulation</span>
+            </div>
+            <span class="level-arrow">→</span>
+            <span class="level-label" style="min-width:80px">New Level</span>
+            <div class="level-btns" id="levelBtns">
+              <button class="lvl-btn" data-level="1" onclick="selectLevel(1)">1</button>
+              <button class="lvl-btn" data-level="2" onclick="selectLevel(2)">2</button>
+              <button class="lvl-btn" data-level="3" onclick="selectLevel(3)">3</button>
+              <button class="lvl-btn" data-level="4" onclick="selectLevel(4)">4</button>
+              <button class="lvl-btn" data-level="5" onclick="selectLevel(5)">5</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Test Report Number</label>
+              <input type="text" id="inputReportNo" class="form-input" placeholder="e.g. H2660959396.0192" />
+            </div>
+            <div class="form-group">
+              <label>Acquired Date</label>
+              <div class="date-input-wrap">
+                <button class="date-display" id="dateDisplay" onclick="toggleCalendar()">
+                  <span id="dateText" style="color:#888">Select date</span>
+                  <span class="cal-icon">📅</span>
+                </button>
+                <div class="calendar-popup" id="calendarPopup">
+                  <div class="cal-header">
+                    <button class="cal-nav" onclick="calNav(-1)">&#8249;</button>
+                    <span id="calMonthLabel"></span>
+                    <button class="cal-nav" onclick="calNav(1)">&#8250;</button>
+                  </div>
+                  <div class="cal-grid">
+                    <div class="cal-weekdays">
+                      <span>Su</span><span>Mo</span><span>Tu</span>
+                      <span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                    </div>
+                    <div class="cal-days" id="calDays"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-top:8px">
+            <button class="btn-primary" id="saveBtn" onclick="submitSkillEntry()">Save Achievement</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS PAGE -->
+  <div id="statsPage" class="page">
+    <div class="stats-grid" id="statsCards">
+      <div class="state-msg">Loading statistics…</div>
+    </div>
+    <div class="stats-section">
+      <div class="stats-section-hdr">Qualification Matrix — All Personnel</div>
+      <div id="statsMatrix">
+        <div class="state-msg">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Upload Progress Modal ── -->
+<div class="modal-overlay" id="uploadOverlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h2 id="uploadTitle">Uploading Excel…</h2>
+    </div>
+    <div class="modal-body" style="padding:20px">
+      <div id="uploadSteps"></div>
+      <div id="uploadResult" class="upload-result" style="display:none"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <button class="btn-primary" id="uploadCloseBtn" onclick="closeUploadModal()" style="display:none">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── History Modal ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Skill History</h2>
+      <button class="modal-close" id="modalClose">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-meta" id="modalMeta"></div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header" style="background:#9a0000">
+      <h2>Confirm Delete</h2>
+      <button class="modal-close" onclick="closeConfirm()">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <p style="margin-bottom:20px;font-size:0.92rem;line-height:1.6">
+        Are you sure you want to permanently delete <strong id="confirmPersonName"></strong>?<br>
+        All skill levels and history records will also be deleted.
+      </p>
+      <div style="display:flex;gap:12px;justify-content:flex-end">
+        <button class="btn-primary" onclick="closeConfirm()" style="background:#555">Cancel</button>
+        <button class="btn-danger" id="confirmDeleteBtn" onclick="executeDeletePerson()" style="background:#c00;color:#fff;border-color:#c00">
+          Yes, Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = "https://vksjvsckahmrzhqqplfv.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZrc2p2c2NrYWhtcnpocXFwbGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDQwMjgsImV4cCI6MjA5MDAyMDAyOH0.2PN-ai1QvpXxELYJ4uoXVdi8iZIJ3khIpehHURpFEPE";
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let viewMode      = "person";   // "person" | "regulation"
+let currentPerson = null;
+let currentType   = "car";
+let allPersons    = [];
+let allRegulations = [];
+let personLevelsMap = {};
+let personIdMap   = {};
+let viewRegsCache = {};          // vtype -> [{id, subject, regulatory_act}]
+
+let pendingDeletePerson = null;  // person object awaiting delete confirm
+let searchText       = "";
+let viewRegResults   = [];       // cached By-Regulation results (unfiltered)
+let viewRegCurrent   = null;     // current regId in By-Regulation mode
+let viewRegMeta      = null;     // current reg metadata {subject, regulatory_act}
+let histModalPid     = null;     // person_id for open history modal
+let histModalRegId   = null;     // regulation_id for open history modal
+let histModalSubject = "";
+let statsLoaded      = false;
+let globalRegsCache  = null;   // all regulations across vehicle types (for global search)
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  // Restore version badge from localStorage
+  const savedVersion = localStorage.getItem("skillMatrixVersion");
+  const vEl = document.getElementById("fileVersion");
+  if (vEl) vEl.textContent = savedVersion || "";
+
+  const sel = document.getElementById("personSelect");
+  sel.disabled = true;
+  sel.options[0].textContent = "Loading...";
+
+  const { data, error } = await db.from("persons").select("id, name").order("name");
+
+  sel.options[0].textContent = "— Select —";
+  sel.disabled = false;
+
+  if (error) {
+    document.getElementById("setupBanner").classList.add("visible");
+    setStatus("⚠ Database not ready. See setup instructions above.");
+    return;
+  }
+
+  allPersons = data || [];
+
+  if (allPersons.length === 0) {
+    document.getElementById("setupBanner").classList.add("visible");
+    setStatus("⚠ No persons found. Click ⬆ Upload Excel to import data.");
+    return;
+  }
+
+  allPersons.forEach(p => personIdMap[p.name] = p.id);
+  populatePersonDropdowns();
+
+  setStatus(`${allPersons.length} persons loaded. Select a view mode to begin.`);
+
+  await loadViewRegulations();
+}
+
+function populatePersonDropdowns() {
+  const targets = ["personSelect"];
+  targets.forEach(id => {
+    const el = document.getElementById(id);
+    // Remove all but first option
+    while (el.options.length > 1) el.remove(1);
+    allPersons.forEach(p => {
+      const o = document.createElement("option");
+      o.value = p.name; o.textContent = p.name;
+      el.appendChild(o);
+    });
+  });
+}
+
+// ── Page / Mode navigation ────────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(page + "Page").classList.add("active");
+  const tabs = document.querySelectorAll(".nav-tab");
+  tabs[0].classList.toggle("active", page === "view");
+  tabs[1].classList.toggle("active", page === "stats");
+  document.getElementById("viewControls").style.display = page === "view" ? "flex" : "none";
+  if (page === "stats") loadStats();
+}
+
+function switchViewMode(mode) {
+  viewMode = mode;
+  document.getElementById("modePersonBtn").classList.toggle("active", mode === "person");
+  document.getElementById("modeRegBtn").classList.toggle("active", mode === "regulation");
+  document.getElementById("viewPersonGroup").style.display = mode === "person" ? "flex" : "none";
+  document.getElementById("viewRegGroup").style.display   = mode === "regulation" ? "flex" : "none";
+
+  // Reset table
+  const wrapper = document.getElementById("tableWrapper");
+  wrapper.innerHTML = mode === "person"
+    ? '<div class="state-msg">Select a person to view skill levels.</div>'
+    : '<div class="state-msg">Select a regulation to see qualified personnel.</div>';
+  setStatus("");
+
+  if (mode === "regulation") loadViewRegulations();
+}
+
+// ── VIEW: By Person ───────────────────────────────────────────────────────────
+document.getElementById("personSelect").addEventListener("change", async e => {
+  currentPerson = e.target.value || null;
+  await loadTable();
+});
+
+document.querySelectorAll(".type-btn[data-type]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    document.querySelectorAll(".type-btn[data-type]").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentType = btn.dataset.type;
+    if (viewMode === "person") await loadTable();
+    else {
+      await loadViewRegulations();
+      document.getElementById("viewRegSelect").value = "";
+      document.getElementById("tableWrapper").innerHTML =
+        '<div class="state-msg">Select a regulation to see qualified personnel.</div>';
+      setStatus("");
+    }
+  });
+});
+
+document.getElementById("modalClose").addEventListener("click", closeModal);
+document.getElementById("modalOverlay").addEventListener("click", e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+async function loadTable() {
+  const wrapper = document.getElementById("tableWrapper");
+  if (!currentPerson) {
+    wrapper.innerHTML = '<div class="state-msg">Select a person to view skill levels.</div>';
+    setStatus(""); return;
+  }
+  wrapper.innerHTML = '<div class="state-msg">Loading...</div>';
+  setStatus("");
+
+  const personId = personIdMap[currentPerson];
+
+  const { data: regs, error: regErr } = await db
+    .from("regulations").select("id, row_index, subject, regulatory_act, un_regulation")
+    .eq("vehicle_type", currentType).order("row_index");
+
+  if (regErr) { wrapper.innerHTML = `<div class="state-msg">Error: ${regErr.message}</div>`; return; }
+  allRegulations = regs || [];
+
+  let levelsMap = {};
+  if (allRegulations.length > 0) {
+    const { data: lvls } = await db.from("skill_levels")
+      .select("regulation_id, current_level")
+      .eq("person_id", personId)
+      .in("regulation_id", allRegulations.map(r => r.id));
+    if (lvls) lvls.forEach(l => {
+      levelsMap[l.regulation_id] = l.current_level;
+    });
+  }
+  personLevelsMap = levelsMap;
+
+  const total = allRegulations.length;
+  const qualified = Object.keys(levelsMap).length;
+  setStatus(`${currentPerson} · ${typeLabel(currentType)} · ${qualified} qualified / ${total} total`);
+  renderTableByPerson(allRegulations, levelsMap);
+}
+
+function renderTableByPerson(regs, levelsMap) {
+  let display = regs.filter(r => levelsMap[r.id] && levelsMap[r.id] !== "0");
+  if (searchText) {
+    const q = searchText.toLowerCase();
+    display = display.filter(r =>
+      (r.subject || "").toLowerCase().includes(q) ||
+      (r.regulatory_act || "").toLowerCase().includes(q) ||
+      (r.un_regulation || "").toLowerCase().includes(q)
+    );
+  }
+  if (display.length === 0) {
+    document.getElementById("tableWrapper").innerHTML =
+      '<div class="state-msg">No qualified regulations found for this person.</div>';
+    return;
+  }
+
+  const rows = display.map((r, i) => {
+    const level    = levelsMap[r.id];
+    const subj  = escHtml(r.subject || "—");
+    const reg   = escHtml(r.regulatory_act || "—");
+    const un    = escHtml(r.un_regulation || "");
+    return `<tr>
+      <td style="color:#888;font-size:0.75rem">${i + 1}</td>
+      <td class="subject" title="${subj}">${truncate(subj, 70)}</td>
+      <td class="reg-act">${truncate(reg, 50)}${un ? `<br><span style="color:#888">${truncate(un,30)}</span>` : ""}</td>
+      <td class="center">
+        <span class="level-badge ${levelBadgeClass(level)}">${escHtml(level)}</span>
+      </td>
+      <td class="center">
+        <button class="hist-btn"
+          onclick="openHistory('${r.id}','${escAttr(r.subject||'')}','${escAttr(r.regulatory_act||'')}',null,null)">
+          History
+        </button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("tableWrapper").innerHTML = `
+    <table>
+      <thead><tr>
+        <th style="width:40px">#</th><th>Subject</th><th>Regulatory Act</th>
+        <th class="center" style="width:80px">Level</th>
+        <th class="center" style="width:90px"></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── VIEW: By Regulation ────────────────────────────────────────────────────────
+async function loadViewRegulations() {
+  const vtype = currentType;
+  if (viewRegsCache[vtype]) {
+    renderViewRegSelect(viewRegsCache[vtype]);
+    return;
+  }
+  const { data } = await db.from("regulations")
+    .select("id, row_index, subject, regulatory_act")
+    .eq("vehicle_type", vtype).order("row_index");
+  viewRegsCache[vtype] = data || [];
+  renderViewRegSelect(viewRegsCache[vtype]);
+}
+
+function renderViewRegSelect(regs) {
+  const sel = document.getElementById("viewRegSelect");
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Select a regulation —</option>';
+  regs.forEach((r, i) => {
+    const regAct = (r.regulatory_act || "").replace(/\n/g," ").trim();
+    const prefix = regAct ? regAct.substring(0, 30) : String(i + 1);
+    const subj   = (r.subject || "—").replace(/\n/g," ").substring(0, 60);
+    const o = document.createElement("option");
+    o.value = r.id;
+    o.textContent = `(${prefix}) ${subj}`;
+    sel.appendChild(o);
+  });
+  if (prev) sel.value = prev;
+}
+
+async function onViewRegChange() {
+  const regId = document.getElementById("viewRegSelect").value;
+  const wrapper = document.getElementById("tableWrapper");
+  if (!regId) {
+    viewRegResults = []; viewRegCurrent = null; viewRegMeta = null;
+    wrapper.innerHTML = '<div class="state-msg">Select a regulation to see qualified personnel.</div>';
+    setStatus(""); return;
+  }
+  wrapper.innerHTML = '<div class="state-msg">Loading...</div>';
+  setStatus("");
+
+  const { data: lvls, error } = await db.from("skill_levels")
+    .select("person_id, current_level")
+    .eq("regulation_id", regId)
+    .neq("current_level", "0");
+
+  if (error) { wrapper.innerHTML = `<div class="state-msg">Error: ${error.message}</div>`; return; }
+
+  const idToName = {};
+  allPersons.forEach(p => idToName[p.id] = p.name);
+
+  const regs = viewRegsCache[currentType] || [];
+  const reg  = regs.find(r => r.id === regId) || null;
+
+  // Cache for search + export
+  viewRegCurrent = regId;
+  viewRegMeta    = reg;
+  viewRegResults = (lvls || [])
+    .filter(l => idToName[l.person_id])
+    .sort((a, b) => idToName[a.person_id].localeCompare(idToName[b.person_id]))
+    .map(l => ({ ...l, name: idToName[l.person_id] }));
+
+  renderByRegTable();
+}
+
+function renderByRegTable() {
+  const wrapper = document.getElementById("tableWrapper");
+  const regId = viewRegCurrent;
+  if (!regId || viewRegResults.length === 0 && !viewRegMeta) {
+    wrapper.innerHTML = '<div class="state-msg">No data.</div>';
+    setStatus(""); return;
+  }
+
+  const reg = viewRegMeta;
+  const regLabel = reg ? truncate((reg.subject||"—").replace(/\n/g," "), 60) : "Regulation";
+
+  let display = viewRegResults;
+  if (searchText) {
+    const q = searchText.toLowerCase();
+    display = display.filter(l => l.name.toLowerCase().includes(q));
+  }
+
+  setStatus(`${regLabel} · ${display.length}${searchText ? " filtered" : ""} / ${viewRegResults.length} qualified`);
+
+  if (display.length === 0) {
+    wrapper.innerHTML = '<div class="state-msg">No matching personnel found.</div>';
+    return;
+  }
+
+  const rows = display.map((l, i) => `<tr>
+    <td style="color:#888;font-size:0.75rem">${i + 1}</td>
+    <td style="font-weight:600">${escHtml(l.name)}</td>
+    <td class="center">
+      <span class="level-badge ${levelBadgeClass(l.current_level)}">${escHtml(l.current_level)}</span>
+    </td>
+    <td class="center">
+      <button class="hist-btn"
+        onclick="openHistory('${regId}','${reg ? escAttr(reg.subject||'') : ''}','',
+          '${l.person_id}','${escAttr(l.name)}')">
+        History
+      </button>
+    </td>
+  </tr>`).join("");
+
+  wrapper.innerHTML = `
+    <table>
+      <thead><tr>
+        <th style="width:40px">#</th><th>Person</th>
+        <th class="center" style="width:100px">Level</th>
+        <th class="center" style="width:90px"></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── History modal ─────────────────────────────────────────────────────────────
+async function openHistory(regId, subject, regAct, personId, personName) {
+  const pid   = personId   || personIdMap[currentPerson];
+  const pname = personName || currentPerson;
+
+  // Store context for delete refresh
+  histModalPid     = pid;
+  histModalRegId   = regId;
+  histModalSubject = subject || "";
+
+  document.getElementById("modalTitle").textContent = "Skill History";
+  document.getElementById("modalMeta").innerHTML =
+    `<strong>Person:</strong> ${escHtml(pname || "—")} &nbsp;|&nbsp;
+     <strong>Vehicle:</strong> ${typeLabel(currentType)}<br>
+     <strong>Regulation:</strong> ${escHtml(subject ? subject.replace(/\n/g," ") : "—")}`;
+  document.getElementById("modalContent").innerHTML =
+    '<div class="state-msg" style="padding:16px">Loading...</div>';
+  document.getElementById("modalOverlay").classList.add("open");
+
+  await refreshHistoryModal();
+}
+
+async function refreshHistoryModal() {
+  const pid   = histModalPid;
+  const regId = histModalRegId;
+
+  const { data } = await db.from("skill_history")
+    .select("id, level, acquired_date, test_report_number")
+    .eq("person_id", pid).eq("regulation_id", regId).order("level");
+
+  if (!data || data.length === 0) {
+    document.getElementById("modalContent").innerHTML =
+      '<div class="no-history">No history records found.</div>';
+    return;
+  }
+
+  const levelLabels = {
+    1: "Level 1 – Regulatory Act Studied",
+    2: "Level 2 – Witness with Qualified Inspector",
+    3: "Level 3 – Supervised Inspection",
+    4: "Level 4 – Qualified Inspector",
+    5: "Level 5 – Expert"
+  };
+
+  const rows = data.map(h => `<tr>
+    <td class="center"><span class="level-badge ${levelBadgeClass(String(h.level))}">${h.level}</span></td>
+    <td>${escHtml(levelLabels[h.level] || `Level ${h.level}`)}</td>
+    <td class="center">${h.acquired_date ? formatDate(h.acquired_date) : "—"}</td>
+    <td style="font-family:monospace;font-size:0.8rem">${escHtml(h.test_report_number || "—")}</td>
+    <td class="center">
+      <button class="hist-del-btn" onclick="deleteHistoryRow('${h.id}', ${h.level})">✕</button>
+    </td>
+  </tr>`).join("");
+
+  document.getElementById("modalContent").innerHTML = `
+    <div class="table-wrapper"><table>
+      <thead><tr>
+        <th class="center" style="width:60px">Level</th><th>Description</th>
+        <th class="center" style="width:110px">Acquired Date</th>
+        <th>Test Report No.</th>
+        <th class="center" style="width:50px"></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+async function deleteHistoryRow(histId, level) {
+  if (!confirm(`Delete Level ${level} history entry?`)) return;
+
+  const { error } = await db.from("skill_history").delete().eq("id", histId);
+  if (error) { showToast("Delete failed: " + error.message, "error"); return; }
+
+  // Recalculate max level from remaining history
+  const { data: remaining } = await db.from("skill_history")
+    .select("level")
+    .eq("person_id", histModalPid)
+    .eq("regulation_id", histModalRegId);
+
+  const maxLevel = remaining && remaining.length > 0
+    ? Math.max(...remaining.map(r => r.level))
+    : null;
+
+  if (maxLevel !== null) {
+    await db.from("skill_levels").upsert(
+      { person_id: histModalPid, regulation_id: histModalRegId, current_level: String(maxLevel) },
+      { onConflict: "person_id,regulation_id" }
+    );
+  }
+
+  showToast(`✓ Level ${level} entry deleted.`, "success");
+  await refreshHistoryModal();
+
+  // Refresh view table in background
+  if (viewMode === "person" && currentPerson) loadTable();
+  else if (viewMode === "regulation" && viewRegCurrent) onViewRegChange();
+}
+
+function closeModal() { document.getElementById("modalOverlay").classList.remove("open"); }
+
+// ── Search ─────────────────────────────────────────────────────────────────────
+function onSearchInput() {
+  searchText = document.getElementById("searchInput").value.trim();
+  if (searchText) {
+    doGlobalSearch(searchText);
+  } else {
+    // Restore normal view
+    if (viewMode === "person" && currentPerson) {
+      renderTableByPerson(allRegulations, personLevelsMap);
+    } else if (viewMode === "regulation" && viewRegCurrent) {
+      renderByRegTable();
+    } else {
+      document.getElementById("tableWrapper").innerHTML =
+        viewMode === "person"
+          ? '<div class="state-msg">Select a person to view skill levels.</div>'
+          : '<div class="state-msg">Select a regulation to see qualified personnel.</div>';
+      setStatus("");
+    }
+  }
+}
+
+async function doGlobalSearch(query) {
+  const wrapper = document.getElementById("tableWrapper");
+  wrapper.innerHTML = '<div class="state-msg">Searching…</div>';
+  setStatus("Searching…");
+
+  // Load all regulations across all vehicle types (cached)
+  if (!globalRegsCache) {
+    const { data } = await db.from("regulations")
+      .select("id, vehicle_type, subject, regulatory_act, un_regulation")
+      .order("vehicle_type").order("row_index");
+    globalRegsCache = data || [];
+  }
+
+  const q = query.toLowerCase();
+
+  const matchingRegs = globalRegsCache.filter(r =>
+    (r.subject || "").toLowerCase().includes(q) ||
+    (r.regulatory_act || "").toLowerCase().includes(q) ||
+    (r.un_regulation || "").toLowerCase().includes(q)
+  );
+
+  const matchingPersons = allPersons.filter(p => p.name.toLowerCase().includes(q));
+
+  if (matchingRegs.length === 0 && matchingPersons.length === 0) {
+    wrapper.innerHTML = '<div class="state-msg">No results found.</div>';
+    setStatus(`"${query}" — no results`);
+    return;
+  }
+
+  const personMap = {};
+  allPersons.forEach(p => personMap[p.id] = p.name);
+  const regMap = {};
+  globalRegsCache.forEach(r => regMap[r.id] = r);
+
+  let rows = [];
+  const seen = new Set();
+
+  // Levels for matching regulations
+  if (matchingRegs.length > 0) {
+    const regIds = matchingRegs.map(r => r.id);
+    const { data: lvls } = await db.from("skill_levels")
+      .select("person_id, regulation_id, current_level")
+      .in("regulation_id", regIds)
+      .neq("current_level", "0");
+    (lvls || []).forEach(l => {
+      const key = `${l.person_id}|${l.regulation_id}`;
+      if (!seen.has(key) && personMap[l.person_id] && regMap[l.regulation_id]) {
+        seen.add(key);
+        rows.push({ personName: personMap[l.person_id], reg: regMap[l.regulation_id], level: l.current_level });
+      }
+    });
+  }
+
+  // Levels for matching persons (add non-duplicates)
+  if (matchingPersons.length > 0) {
+    const personIds = matchingPersons.map(p => p.id);
+    const { data: lvls } = await db.from("skill_levels")
+      .select("person_id, regulation_id, current_level")
+      .in("person_id", personIds)
+      .neq("current_level", "0");
+    (lvls || []).forEach(l => {
+      const key = `${l.person_id}|${l.regulation_id}`;
+      if (!seen.has(key) && personMap[l.person_id] && regMap[l.regulation_id]) {
+        seen.add(key);
+        rows.push({ personName: personMap[l.person_id], reg: regMap[l.regulation_id], level: l.current_level });
+      }
+    });
+  }
+
+  renderSearchResults(rows, query);
+}
+
+function renderSearchResults(rows, query) {
+  const wrapper = document.getElementById("tableWrapper");
+  setStatus(`"${query}" · ${rows.length} result${rows.length !== 1 ? "s" : ""}`);
+
+  if (rows.length === 0) {
+    wrapper.innerHTML = '<div class="state-msg">No results found.</div>';
+    return;
+  }
+
+  rows.sort((a, b) =>
+    a.personName.localeCompare(b.personName) ||
+    (a.reg?.vehicle_type || "").localeCompare(b.reg?.vehicle_type || "") ||
+    (a.reg?.subject || "").localeCompare(b.reg?.subject || "")
+  );
+
+  const html = rows.map((r, i) => {
+    const subj = escHtml(r.reg?.subject || "—");
+    const act  = escHtml(r.reg?.regulatory_act || "");
+    const un   = escHtml(r.reg?.un_regulation || "");
+    const vt   = r.reg?.vehicle_type === "car" ? "Car" : r.reg?.vehicle_type === "tractor" ? "Tractor" : "Moto";
+    return `<tr>
+      <td style="color:#888;font-size:0.75rem">${i + 1}</td>
+      <td><strong>${escHtml(r.personName)}</strong></td>
+      <td style="font-size:0.78rem;color:#666;white-space:nowrap">${vt}</td>
+      <td class="subject" title="${subj}">${truncate(subj, 60)}
+        ${act ? `<br><span style="color:#888;font-size:0.75rem">${truncate(act, 40)}</span>` : ""}
+        ${un  ? `<br><span style="color:#aaa;font-size:0.72rem">${truncate(un, 30)}</span>`  : ""}
+      </td>
+      <td class="center">
+        <span class="level-badge ${levelBadgeClass(r.level)}">${escHtml(String(r.level))}</span>
+      </td>
+    </tr>`;
+  }).join("");
+
+  wrapper.innerHTML = `
+    <table>
+      <thead><tr>
+        <th style="width:40px">#</th>
+        <th>Person</th>
+        <th style="width:60px">Type</th>
+        <th>Regulation</th>
+        <th class="center" style="width:80px">Level</th>
+      </tr></thead>
+      <tbody>${html}</tbody>
+    </table>`;
+}
+
+// ── INPUT: Delete Person ───────────────────────────────────────────────────────
+function onDeletePersonChange() {
+  const name = document.getElementById("deletePersonSelect").value;
+  const btn  = document.getElementById("deletePersonBtn");
+  const warn = document.getElementById("deleteWarning");
+  if (name) {
+    document.getElementById("deletePersonName").textContent = name;
+    warn.classList.add("visible");
+    btn.disabled = false;
+    pendingDeletePerson = allPersons.find(p => p.name === name);
+  } else {
+    warn.classList.remove("visible");
+    btn.disabled = true;
+    pendingDeletePerson = null;
+  }
+}
+
+function confirmDeletePerson() {
+  if (!pendingDeletePerson) return;
+  document.getElementById("confirmPersonName").textContent = pendingDeletePerson.name;
+  document.getElementById("confirmOverlay").classList.add("open");
+}
+
+function closeConfirm() {
+  document.getElementById("confirmOverlay").classList.remove("open");
+}
+
+async function executeDeletePerson() {
+  if (!pendingDeletePerson) return;
+  const btn = document.getElementById("confirmDeleteBtn");
+  btn.textContent = "Deleting..."; btn.disabled = true;
+
+  const { error } = await db.from("persons").delete().eq("id", pendingDeletePerson.id);
+
+  btn.textContent = "Yes, Delete"; btn.disabled = false;
+  closeConfirm();
+
+  if (error) { showToast("Delete failed: " + error.message, "error"); return; }
+
+  const name = pendingDeletePerson.name;
+  // Remove from local state
+  allPersons = allPersons.filter(p => p.id !== pendingDeletePerson.id);
+  delete personIdMap[name];
+  pendingDeletePerson = null;
+
+  // Refresh all dropdowns
+  populatePersonDropdowns();
+  document.getElementById("deletePersonSelect").value = "";
+  document.getElementById("deleteWarning").classList.remove("visible");
+  document.getElementById("deletePersonBtn").disabled = true;
+
+  // If current view person was deleted, reset view
+  if (currentPerson === name) {
+    currentPerson = null;
+    document.getElementById("personSelect").value = "";
+    document.getElementById("tableWrapper").innerHTML =
+      '<div class="state-msg">Select a person to view skill levels.</div>';
+    setStatus("");
+  }
+
+  showToast(`✓ "${name}" has been removed.`, "success");
+}
+
+// ── INPUT: Add Person ──────────────────────────────────────────────────────────
+async function submitNewPerson() {
+  const nameEl = document.getElementById("newPersonName");
+  const name = nameEl.value.trim();
+  if (!name) { showToast("Please enter a name.", "error"); return; }
+
+  const { data, error } = await db.from("persons").insert({ name }).select().single();
+  if (error) {
+    showToast(error.message.includes("unique") ? `"${name}" already exists.` : error.message, "error");
+    return;
+  }
+
+  allPersons.push(data);
+  allPersons.sort((a, b) => a.name.localeCompare(b.name));
+  personIdMap[data.name] = data.id;
+  populatePersonDropdowns();
+
+  nameEl.value = "";
+  showToast(`✓ "${name}" added successfully.`, "success");
+}
+
+// ── INPUT: Load regulations for skill entry ────────────────────────────────────
+async function loadInputRegulations() {
+  const vtype = document.getElementById("inputTypeSelect").value;
+  const personName = document.getElementById("inputPersonSelect").value;
+  const regSel = document.getElementById("inputRegSelect");
+
+  regSel.innerHTML = '<option value="">Loading...</option>';
+  regSel.disabled = true;
+
+  const { data: regs } = await db.from("regulations")
+    .select("id, row_index, subject, regulatory_act")
+    .eq("vehicle_type", vtype).order("row_index");
+
+  inputRegs = regs || [];
+  inputLevelsMap = {};
+
+  if (personName && inputRegs.length > 0) {
+    const pid = personIdMap[personName];
+    if (pid) {
+      const { data: lvls } = await db.from("skill_levels")
+        .select("regulation_id, current_level")
+        .eq("person_id", pid)
+        .in("regulation_id", inputRegs.map(r => r.id));
+      if (lvls) lvls.forEach(l => inputLevelsMap[l.regulation_id] = l.current_level);
+    }
+  }
+
+  regSel.innerHTML = '<option value="">— Select a regulation —</option>';
+  inputRegs.forEach(r => {
+    const curLvl = inputLevelsMap[r.id] || "0";
+    const lbl = curLvl === "0" ? "—" : `L${curLvl}`;
+    const subj = (r.subject || "—").replace(/\n/g, " ").substring(0, 65);
+    const regAct = (r.regulatory_act || "").replace(/\n/g, " ").substring(0, 35);
+    const o = document.createElement("option");
+    o.value = r.id;
+    o.textContent = `[${lbl}] ${subj}${regAct ? " · " + regAct : ""}`;
+    regSel.appendChild(o);
+  });
+  regSel.disabled = false;
+  resetLevelUI();
+}
+
+async function onInputPersonChange() { await loadInputRegulations(); }
+async function onInputTypeChange()   { await loadInputRegulations(); }
+
+function onInputRegChange() {
+  const regId = document.getElementById("inputRegSelect").value;
+  if (!regId) { resetLevelUI(); return; }
+  updateLevelUI(inputLevelsMap[regId] || "0");
+}
+
+function updateLevelUI(curLevel) {
+  const badge = document.getElementById("currentLevelBadge");
+  badge.className = "level-badge " + levelBadgeClass(curLevel);
+  badge.textContent = curLevel === "0" ? "—" : curLevel;
+
+  const descs = { "0":"No qualification","1":"Act Studied","2":"Witnessed","3":"Supervised","4":"Qualified","5":"Expert" };
+  document.getElementById("currentLevelDesc").textContent = descs[curLevel] || curLevel;
+
+  const curNum = isNaN(parseInt(curLevel)) ? 5 : parseInt(curLevel);
+  document.querySelectorAll(".lvl-btn").forEach(btn => {
+    const lv = parseInt(btn.dataset.level);
+    btn.classList.remove("selected", "achieved");
+    btn.disabled = false;
+    if (lv <= curNum) btn.classList.add("achieved");
+  });
+  selectedLevel = null;
+  if (curNum < 5) selectLevel(Math.min(curNum + 1, 5));
+}
+
+function resetLevelUI() {
+  document.getElementById("currentLevelBadge").className = "level-badge level-0";
+  document.getElementById("currentLevelBadge").textContent = "—";
+  document.getElementById("currentLevelDesc").textContent = "Select a regulation";
+  document.querySelectorAll(".lvl-btn").forEach(b => { b.classList.remove("selected","achieved"); b.disabled = false; });
+  selectedLevel = null;
+}
+
+function selectLevel(lv) {
+  selectedLevel = lv;
+  document.querySelectorAll(".lvl-btn").forEach(b =>
+    b.classList.toggle("selected", parseInt(b.dataset.level) === lv));
+}
+
+// ── INPUT: Save skill achievement ──────────────────────────────────────────────
+async function submitSkillEntry() {
+  const personName = document.getElementById("inputPersonSelect").value;
+  const regId      = document.getElementById("inputRegSelect").value;
+  const reportNo   = document.getElementById("inputReportNo").value.trim();
+
+  if (!personName) { showToast("Select a person.", "error"); return; }
+  if (!regId)      { showToast("Select a regulation.", "error"); return; }
+  if (!selectedLevel) { showToast("Select a level (1–5).", "error"); return; }
+  if (!selectedDate)  { showToast("Select an acquired date.", "error"); return; }
+
+  const personId = personIdMap[personName];
+  const saveBtn = document.getElementById("saveBtn");
+  saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+
+  try {
+    const { error: histErr } = await db.from("skill_history").insert({
+      person_id: personId, regulation_id: regId,
+      level: selectedLevel, acquired_date: selectedDate,
+      test_report_number: reportNo || null
+    });
+    if (histErr) throw histErr;
+
+    const curLevel = inputLevelsMap[regId] || "0";
+    const curNum   = isNaN(parseInt(curLevel)) ? 0 : parseInt(curLevel);
+    if (selectedLevel >= curNum) {
+      const { error: lvlErr } = await db.from("skill_levels").upsert(
+        { person_id: personId, regulation_id: regId, current_level: String(selectedLevel) },
+        { onConflict: "person_id,regulation_id" }
+      );
+      if (lvlErr) throw lvlErr;
+      inputLevelsMap[regId] = String(selectedLevel);
+    }
+
+    showToast(`✓ Level ${selectedLevel} recorded for ${personName}.`, "success");
+    await loadInputRegulations();
+    document.getElementById("inputRegSelect").value = regId;
+    onInputRegChange();
+    document.getElementById("inputReportNo").value = "";
+    clearDate();
+  } catch (err) {
+    showToast(err.message || "Save failed.", "error");
+  } finally {
+    saveBtn.disabled = false; saveBtn.textContent = "Save Achievement";
+  }
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function toggleCalendar() {
+  const popup = document.getElementById("calendarPopup");
+  popup.classList.toggle("open");
+  if (popup.classList.contains("open")) renderCalendar();
+}
+function closeCalendar() { document.getElementById("calendarPopup").classList.remove("open"); }
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const months = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+  document.getElementById("calMonthLabel").textContent = `${months[calMonth]} ${calYear}`;
+
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+  const today = new Date();
+  const total = Math.ceil((first + daysInMonth) / 7) * 7;
+
+  let html = "", day = 1, nextDay = 1;
+  for (let i = 0; i < total; i++) {
+    if (i < first) {
+      html += `<button class="cal-day other-month empty" disabled>${daysInPrev - first + i + 1}</button>`;
+    } else if (day <= daysInMonth) {
+      const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+      const isSel   = dateStr === selectedDate;
+      html += `<button class="cal-day${isToday?" today":""}${isSel?" selected":""}"
+        onclick="pickDate('${dateStr}')">${day}</button>`;
+      day++;
+    } else {
+      html += `<button class="cal-day other-month empty" disabled>${nextDay++}</button>`;
+    }
+  }
+  document.getElementById("calDays").innerHTML = html;
+}
+
+function pickDate(dateStr) {
+  selectedDate = dateStr;
+  document.getElementById("dateText").textContent = dateStr;
+  document.getElementById("dateText").style.color = "#1a2a3a";
+  closeCalendar();
+}
+function clearDate() {
+  selectedDate = null;
+  document.getElementById("dateText").textContent = "Select date";
+  document.getElementById("dateText").style.color = "#888";
+}
+
+document.addEventListener("click", e => {
+  const wrap = document.querySelector(".date-input-wrap");
+  if (wrap && !wrap.contains(e.target)) closeCalendar();
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function levelBadgeClass(level) {
+  if (!level || level === "0") return "level-0";
+  if (level === "1") return "level-1";
+  if (level === "2") return "level-2";
+  if (level === "3") return "level-3";
+  if (level === "4") return "level-4";
+  if (level === "5") return "level-5";
+  return "level-sp";
+}
+function typeLabel(t) {
+  return { car: "Vehicle (Car)", tractor: "Tractor", motorcycle: "Motorcycle" }[t] || t;
+}
+function setStatus(msg) { document.getElementById("statusBar").textContent = msg; }
+function formatDate(d) {
+  if (!d) return "—";
+  const p = d.split("-");
+  return p.length === 3 ? `${p[0]}-${p[1]}-${p[2]}` : d;
+}
+function truncate(s, n) { return String(s).length > n ? String(s).slice(0, n) + "…" : String(s); }
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function escAttr(s) { return String(s).replace(/'/g,"\\'").replace(/\n/g," "); }
+function showToast(msg, type = "success") {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  if (allPersons.length === 0) {
+    document.getElementById("statsCards").innerHTML =
+      '<div class="state-msg">No data loaded yet.</div>';
+    return;
+  }
+
+  document.getElementById("statsCards").innerHTML =
+    '<div class="state-msg" style="padding:10px">Loading…</div>';
+  document.getElementById("statsMatrix").innerHTML =
+    '<div class="state-msg" style="padding:16px">Loading…</div>';
+
+  // 1. Regulation counts per vehicle type
+  const { data: regs } = await db.from("regulations").select("vehicle_type");
+  const regCounts = { car: 0, tractor: 0, motorcycle: 0 };
+  (regs || []).forEach(r => { if (regCounts[r.vehicle_type] !== undefined) regCounts[r.vehicle_type]++; });
+
+  // 2. All skill_levels with vehicle_type via join
+  const { data: lvls } = await db.from("skill_levels")
+    .select("person_id, current_level, regulations(vehicle_type)")
+    .neq("current_level", "0");
+
+  // 3. Aggregate: person_id × vehicle_type → count
+  const matrix = {};  // person_id → { car: N, tractor: N, motorcycle: N }
+  (lvls || []).forEach(l => {
+    const vtype = l.regulations?.vehicle_type;
+    if (!vtype) return;
+    if (!matrix[l.person_id]) matrix[l.person_id] = { car: 0, tractor: 0, motorcycle: 0 };
+    matrix[l.person_id][vtype]++;
+  });
+
+  const totalSkills = (lvls || []).length;
+
+  // ── Summary cards ────────────────────────────────────────────────────────────
+  document.getElementById("statsCards").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-num">${allPersons.length}</div>
+      <div class="stat-lbl">Personnel</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${regCounts.car}</div>
+      <div class="stat-lbl">Vehicle Regs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${regCounts.tractor}</div>
+      <div class="stat-lbl">Tractor Regs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${regCounts.motorcycle}</div>
+      <div class="stat-lbl">Motorcycle Regs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${totalSkills}</div>
+      <div class="stat-lbl">Total Qualifications</div>
+    </div>`;
+
+  // ── Qualification matrix ─────────────────────────────────────────────────────
+  function barCell(count, total) {
+    if (total === 0) return '<td class="center" style="color:#ccc">—</td>';
+    const pct = Math.round(count / total * 100);
+    return `<td class="qual-cell" style="padding:8px 14px">
+      <div class="qual-bar-wrap">
+        <div class="qual-bar-bg"><div class="qual-bar-fill" style="width:${pct}%"></div></div>
+        <span class="qual-pct">${count}/${total}</span>
+      </div>
+    </td>`;
+  }
+
+  const personRows = allPersons.map(p => {
+    const m = matrix[p.id] || { car: 0, tractor: 0, motorcycle: 0 };
+    return `<tr>
+      <td style="padding:8px 14px;font-weight:600">
+        <span class="stats-person-link"
+          onclick="showPage('view');
+                   document.getElementById('personSelect').value='${escAttr(p.name)}';
+                   currentPerson='${escAttr(p.name)}'; loadTable();">
+          ${escHtml(p.name)}
+        </span>
+      </td>
+      ${barCell(m.car, regCounts.car)}
+      ${barCell(m.tractor, regCounts.tractor)}
+      ${barCell(m.motorcycle, regCounts.motorcycle)}
+    </tr>`;
+  }).join("");
+
+  document.getElementById("statsMatrix").innerHTML = `
+    <div class="table-wrapper" style="border-radius:0;border:none">
+    <table>
+      <thead><tr>
+        <th style="width:200px">Person</th>
+        <th class="center" style="width:160px">Vehicle (Car)</th>
+        <th class="center" style="width:160px">Tractor</th>
+        <th class="center" style="width:160px">Motorcycle</th>
+      </tr></thead>
+      <tbody>${personRows}</tbody>
+    </table></div>`;
+}
+
+// ── Excel Upload ──────────────────────────────────────────────────────────────
+
+function uploadExcel() { document.getElementById("excelFileInput").click(); }
+function closeUploadModal() {
+  document.getElementById("uploadOverlay").classList.remove("open");
+  document.getElementById("excelFileInput").value = "";
+}
+
+function extractVersion(filename) {
+  const m = filename.match(/rev(\d{2})(\d{2})(\d{2})/i);
+  return m ? `ver.20${m[1]}.${m[2]}.${m[3]}` : null;
+}
+
+function getColConfig(vtype) {
+  return {
+    car:        { level:18, dates:[19,20,21,22,23], subject:5, reg_act:6, un_reg:7,    data_start:13 },
+    tractor:    { level:24, dates:[25,26,27,28,29], subject:3, reg_act:4, un_reg:5,    data_start:13 },
+    motorcycle: { level:20, dates:[21,22,23,24,25], subject:4, reg_act:5, un_reg:null, data_start:13 },
+  }[vtype] || null;
+}
+
+function parseSheetNameXL(name) {
+  const n = name.replace(/#/g, "").trim();
+  if (n.includes("(Car)"))     return { person: n.replace("(Car)","").trim(),     vtype:"car" };
+  if (n.includes("(Tractor)")) return { person: n.replace("(Tractor)","").trim(), vtype:"tractor" };
+  if (n.includes("(Moto)"))    return { person: n.replace("(Moto)","").trim(),     vtype:"motorcycle" };
+  return null;
+}
+
+function cleanLevelVal(val) {
+  if (val == null || val === "" || val === 0) return null;
+  const s = String(val).trim();
+  if (!s || s === "0") return null;
+  const f = parseFloat(s);
+  if (!isNaN(f) && f === Math.floor(f) && f > 0) return String(Math.floor(f));
+  return s;
+}
+
+function cleanDateVal(val) {
+  if (!val) return null;
+  if (val instanceof Date && !isNaN(val)) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth()+1).padStart(2,"0");
+    const d = String(val.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(val).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s.slice(0,10)) ? s.slice(0,10) : null;
+}
+
+
+function extractReportFromComment(ws, addr) {
+  try {
+    const cell = ws[addr];
+    if (!cell?.c) return null;
+    const skipPhrases = ["Previous working","Mark x","Liste des","According to",
+                         "스레드 댓글","go.microsoft.com","이 스레드"];
+    const allText = cell.c.map(c => c.t || "").join("\n");
+    const lines = allText.split("\n").map(l => l.trim()).filter(Boolean);
+    const reports = [];
+    for (const line of lines) {
+      if (skipPhrases.some(s => line.includes(s))) continue;
+      if (/^[\w\s\-\.]+:\s*$/.test(line)) continue;
+      if (line.includes(":")) {
+        const after = line.split(":")[1].trim();
+        if (after) reports.push(after.replace(/,$/,""));
+      } else {
+        reports.push(line.replace(/,$/,""));
+      }
+    }
+    return reports.filter(Boolean).join(" | ") || null;
+  } catch { return null; }
+}
+
+function parseExcelWorkbook(wb) {
+  const personsSet = new Set();
+  // regs keyed by "vtype|rowIdx"
+  const regsMap    = new Map();
+  const levels     = [];
+  const history    = [];
+
+  for (const sheetName of wb.SheetNames) {
+    const parsed = parseSheetNameXL(sheetName);
+    if (!parsed) continue;
+    const { person, vtype } = parsed;
+    const cfg = getColConfig(vtype);
+    if (!cfg) continue;
+
+    personsSet.add(person);
+    const ws = wb.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
+
+    for (let row = cfg.data_start; row <= range.e.r; row++) {
+      const levelAddr = XLSX.utils.encode_cell({ r: row, c: cfg.level });
+      const rawLevel  = ws[levelAddr]?.v;
+      const level     = cleanLevelVal(rawLevel);
+      if (!level) continue;
+
+      const subjectAddr = XLSX.utils.encode_cell({ r: row, c: cfg.subject });
+      const subject     = ws[subjectAddr]?.v ? String(ws[subjectAddr].v).trim() : null;
+      if (!subject) continue;
+
+      const regActAddr = XLSX.utils.encode_cell({ r: row, c: cfg.reg_act });
+      const regAct     = ws[regActAddr]?.v ? String(ws[regActAddr].v).trim() : null;
+      const unRegAddr  = cfg.un_reg != null ? XLSX.utils.encode_cell({ r: row, c: cfg.un_reg }) : null;
+      const unReg      = unRegAddr && ws[unRegAddr]?.v ? String(ws[unRegAddr].v).trim() : null;
+
+      const regKey = `${vtype}|${row}`;
+      if (!regsMap.has(regKey)) {
+        regsMap.set(regKey, { vtype, row_index: row, subject, regulatory_act: regAct, un_regulation: unReg });
+      }
+
+      levels.push({ person, regKey, level });
+
+      for (const dateCol of cfg.dates) {
+        const dateAddr   = XLSX.utils.encode_cell({ r: row, c: dateCol });
+        const rawDate    = ws[dateAddr]?.v;
+        const dateStr    = cleanDateVal(rawDate instanceof Date ? rawDate : ws[dateAddr]?.v);
+        if (!dateStr) continue;
+
+        const levelNum = parseInt(level);
+        if (isNaN(levelNum)) continue;
+
+        const reportNo = extractReportFromComment(ws, dateAddr);
+        history.push({ person, regKey, level: levelNum, acquired_date: dateStr, test_report_number: reportNo });
+      }
+    }
+  }
+  return { persons: [...personsSet], regs: [...regsMap.entries()].map(([k,v])=>({key:k,...v})), levels, history };
+}
+
+function setUploadStep(stepEl, state, text) {
+  stepEl.className = `upload-step ${state}`;
+  stepEl.querySelector(".step-text").textContent = text;
+}
+
+async function uploadToSupabase(parsed, version) {
+  const overlay = document.getElementById("uploadOverlay");
+  const stepsEl = document.getElementById("uploadSteps");
+  const resultEl = document.getElementById("uploadResult");
+  const closeBtn = document.getElementById("uploadCloseBtn");
+
+  const steps = ["persons","regulations","levels","history"];
+  const icons = { persons:"👤", regulations:"📋", levels:"🏆", history:"📅" };
+  stepsEl.innerHTML = steps.map(s => `
+    <div class="upload-step" id="step-${s}">
+      <span class="step-icon">${icons[s]}</span>
+      <span class="step-text">${s.charAt(0).toUpperCase()+s.slice(1)}…</span>
+    </div>`).join("");
+
+  // ── 1. Upsert persons ──────────────────────────────────────────────
+  setUploadStep(document.getElementById("step-persons"), "active", `Syncing ${parsed.persons.length} persons…`);
+  const { data: personRows, error: pErr } = await db.from("persons")
+    .upsert(parsed.persons.map(n => ({ name: n })), { onConflict:"name" })
+    .select("id, name");
+  if (pErr) throw new Error("persons: " + pErr.message);
+
+  const nameToId = {};
+  personRows.forEach(p => nameToId[p.name] = p.id);
+
+  // Delete persons no longer in the Excel
+  const keepNames = parsed.persons;
+  const { data: allDbPersons } = await db.from("persons").select("id, name");
+  const toDelete = (allDbPersons || []).filter(p => !keepNames.includes(p.name));
+  for (const p of toDelete) {
+    await db.from("persons").delete().eq("id", p.id);
+    delete nameToId[p.name];
+  }
+  setUploadStep(document.getElementById("step-persons"), "done",
+    `✓ ${parsed.persons.length} persons synced${toDelete.length ? ` (${toDelete.length} removed)` : ""}`);
+
+  // ── 2. Upsert regulations ──────────────────────────────────────────
+  setUploadStep(document.getElementById("step-regulations"), "active", `Uploading ${parsed.regs.length} regulations…`);
+  const regUpsertData = parsed.regs.map(r => ({
+    vehicle_type: r.vtype, row_index: r.row_index,
+    subject: r.subject, regulatory_act: r.regulatory_act, un_regulation: r.un_regulation
+  }));
+  const BATCH = 50;
+  const keyToId = {};
+  for (let i = 0; i < regUpsertData.length; i += BATCH) {
+    const { data: regRows, error: rErr } = await db.from("regulations")
+      .upsert(regUpsertData.slice(i, i+BATCH), { onConflict:"vehicle_type,row_index" })
+      .select("id, vehicle_type, row_index");
+    if (rErr) throw new Error("regulations: " + rErr.message);
+    regRows.forEach(r => keyToId[`${r.vehicle_type}|${r.row_index}`] = r.id);
+  }
+  setUploadStep(document.getElementById("step-regulations"), "done", `✓ ${parsed.regs.length} regulations uploaded`);
+
+  // ── 3. Replace skill_levels ────────────────────────────────────────
+  setUploadStep(document.getElementById("step-levels"), "active", `Uploading ${parsed.levels.length} skill levels…`);
+  await db.from("skill_levels").delete().neq("id","00000000-0000-0000-0000-000000000000");
+  const lvlData = parsed.levels
+    .filter(l => nameToId[l.person] && keyToId[l.regKey])
+    .map(l => ({
+      person_id: nameToId[l.person], regulation_id: keyToId[l.regKey],
+      current_level: l.level
+    }));
+  for (let i = 0; i < lvlData.length; i += BATCH) {
+    const { error: lErr } = await db.from("skill_levels").insert(lvlData.slice(i, i+BATCH));
+    if (lErr) throw new Error("skill_levels: " + lErr.message);
+  }
+  setUploadStep(document.getElementById("step-levels"), "done", `✓ ${lvlData.length} skill levels uploaded`);
+
+  // ── 4. Replace skill_history ───────────────────────────────────────
+  setUploadStep(document.getElementById("step-history"), "active", `Uploading ${parsed.history.length} history records…`);
+  await db.from("skill_history").delete().gte("created_at","1900-01-01");
+  const histData = parsed.history
+    .filter(h => nameToId[h.person] && keyToId[h.regKey])
+    .map(h => ({
+      person_id: nameToId[h.person], regulation_id: keyToId[h.regKey],
+      level: h.level, acquired_date: h.acquired_date, test_report_number: h.test_report_number
+    }));
+  for (let i = 0; i < histData.length; i += BATCH) {
+    const { error: hErr } = await db.from("skill_history").insert(histData.slice(i, i+BATCH));
+    if (hErr) throw new Error("skill_history: " + hErr.message);
+  }
+  setUploadStep(document.getElementById("step-history"), "done", `✓ ${histData.length} history records uploaded`);
+
+  // ── Done ──────────────────────────────────────────────────────────
+  globalRegsCache = null; // invalidate cache so next search gets fresh data
+  viewRegsCache   = {};
+  if (version) {
+    localStorage.setItem("skillMatrixVersion", version);
+    const vEl = document.getElementById("fileVersion");
+    if (vEl) vEl.textContent = version;
+  }
+  document.getElementById("uploadTitle").textContent = "Upload Complete ✅";
+  resultEl.innerHTML = `
+    <strong>${parsed.persons.length}</strong> persons &nbsp;·&nbsp;
+    <strong>${parsed.regs.length}</strong> regulations &nbsp;·&nbsp;
+    <strong>${lvlData.length}</strong> skill levels &nbsp;·&nbsp;
+    <strong>${histData.length}</strong> history records`;
+  resultEl.style.display = "block";
+  closeBtn.style.display = "inline-block";
+
+  // Reset caches and reload
+  viewRegsCache = {};
+  statsLoaded   = false;
+  await init();
+}
+
+async function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!confirm("이 작업은 기존 모든 데이터를 새 파일로 교체합니다.\n계속하시겠습니까?")) {
+    event.target.value = "";
+    return;
+  }
+
+  const version = extractVersion(file.name);
+  const overlay = document.getElementById("uploadOverlay");
+  document.getElementById("uploadTitle").textContent = "Uploading Excel…";
+  document.getElementById("uploadResult").style.display = "none";
+  document.getElementById("uploadCloseBtn").style.display = "none";
+  overlay.classList.add("open");
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buffer), {
+      type: "array", cellDates: true, cellComments: true, cellStyles: true
+    });
+    const parsed = parseExcelWorkbook(wb);
+    await uploadToSupabase(parsed, version);
+  } catch (err) {
+    document.getElementById("uploadTitle").textContent = "Upload Failed ❌";
+    document.getElementById("uploadResult").innerHTML =
+      `<span style="color:#c00">${escHtml(err.message)}</span>`;
+    document.getElementById("uploadResult").style.display = "block";
+    document.getElementById("uploadCloseBtn").style.display = "inline-block";
+  }
+}
+
+// ── Start ──────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

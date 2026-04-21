@@ -1,0 +1,7 @@
+.vercel
+.bkit/
+.claude/
+*.xlsx
+*.xls
+upload_data.py
+create_schema.sql
