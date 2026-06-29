@@ -1,7 +1,10 @@
 .vercel
 .bkit/
 .claude/
+node_modules/
+supabase/.temp/
 *.xlsx
 *.xls
 upload_data.py
 create_schema.sql
+.env*

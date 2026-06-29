@@ -36,6 +36,16 @@
     }
     .nav-tab:hover { color: #fff; }
     .nav-tab.active { color: #fff; border-bottom-color: #fff; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .admin-status { font-size: 0.78rem; opacity: 0.85; }
+    .admin-btn {
+      height: 34px; padding: 0 12px; border: 1.5px solid rgba(255,255,255,0.8);
+      border-radius: 4px; background: rgba(255,255,255,0.08); color: #fff;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    }
+    .admin-btn:hover { background: rgba(255,255,255,0.18); }
+    .admin-only { display: none !important; }
+    body.admin-logged-in .admin-only { display: flex !important; }
 
     /* ── Controls bar ── */
     .controls {
@@ -308,6 +318,13 @@
     .btn-upload:disabled { opacity: 0.4; cursor: default; }
 
 
+    /* ── Admin login/change-password modal ── */
+    .auth-form { display: flex; flex-direction: column; gap: 14px; }
+    .auth-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+    .auth-note { font-size: 0.82rem; color: #555; line-height: 1.5; }
+    .auth-error { display: none; color: #c00; font-size: 0.84rem; line-height: 1.4; }
+    .auth-error.visible { display: block; }
+
     /* ── Upload progress modal ── */
     .upload-step {
       display: flex; align-items: center; gap: 10px;
@@ -368,10 +385,16 @@
     </div>
     <span id="fileVersion" class="version-badge"></span>
   </div>
-  <nav class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('view')">📋 View</button>
-    <button class="nav-tab" onclick="showPage('stats')">📊 Stats</button>
-  </nav>
+  <div class="header-actions">
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('view')">📋 View</button>
+      <button class="nav-tab" onclick="showPage('stats')">📊 Stats</button>
+    </nav>
+    <span class="admin-status" id="adminStatus">조회 전용</span>
+    <button class="admin-btn" id="adminLoginBtn" onclick="openAdminLogin()">Admin Login</button>
+    <button class="admin-btn admin-only" id="adminPwBtn" onclick="openPasswordModal()">Change PW</button>
+    <button class="admin-btn admin-only" id="adminLogoutBtn" onclick="logoutAdmin()">Logout</button>
+  </div>
 </header>
 
 <!-- ── View Controls ── -->
@@ -427,8 +450,8 @@
   </div>
 
   <!-- Upload -->
-  <div class="control-group">
-    <label>&nbsp;</label>
+  <div class="control-group admin-only" id="uploadControlGroup">
+    <label>Admin Upload</label>
     <button class="btn-upload" onclick="uploadExcel()">⬆ Upload Excel</button>
     <input type="file" id="excelFileInput" accept=".xlsx" style="display:none"
       onchange="handleFileSelect(event)" />
@@ -442,7 +465,7 @@
   <!-- VIEW PAGE -->
   <div id="viewPage" class="page active">
     <div class="setup-banner" id="setupBanner">
-      <b>No data found.</b> Click <b>⬆ Upload Excel</b> to import data.
+      <b>No data found.</b> 조회는 누구나 가능하며, Excel 업로드는 관리자 로그인 후 가능합니다.
     </div>
     <div class="status-bar" id="statusBar"></div>
     <div class="table-wrapper" id="tableWrapper">
@@ -591,6 +614,63 @@
 
 </main>
 
+<!-- ── Admin Login Modal ── -->
+<div class="modal-overlay" id="adminLoginOverlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2>Admin Login</h2>
+      <button class="modal-close" onclick="closeAdminLogin()">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <div class="auth-form">
+        <div class="auth-note">관리자 로그인 후에만 Excel 업로드 메뉴가 열립니다. 로그인 전에는 조회만 가능합니다.</div>
+        <div class="form-group">
+          <label>ID</label>
+          <input type="text" id="adminUser" class="form-input" autocomplete="username" value="admin" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="adminPassword" class="form-input" autocomplete="current-password" />
+        </div>
+        <div class="auth-error" id="adminLoginError"></div>
+        <div class="auth-actions">
+          <button class="btn-primary" onclick="submitAdminLogin()">Login</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Change Password Modal ── -->
+<div class="modal-overlay" id="passwordOverlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h2>Change Admin Password</h2>
+      <button class="modal-close" onclick="closePasswordModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <div class="auth-form">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="currentAdminPassword" class="form-input" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="newAdminPassword" class="form-input" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="confirmAdminPassword" class="form-input" autocomplete="new-password" />
+        </div>
+        <div class="auth-error" id="passwordChangeError"></div>
+        <div class="auth-actions">
+          <button class="btn-primary" onclick="submitPasswordChange()">Update Password</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Upload Progress Modal ── -->
 <div class="modal-overlay" id="uploadOverlay">
   <div class="modal" style="max-width:460px">
@@ -675,9 +755,94 @@ let histModalRegId   = null;     // regulation_id for open history modal
 let histModalSubject = "";
 let statsLoaded      = false;
 let globalRegsCache  = null;   // all regulations across vehicle types (for global search)
+let adminToken       = localStorage.getItem("skillMatrixAdminToken") || null;
+
+function isAdminLoggedIn() { return !!adminToken; }
+function setAuthError(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("visible", !!msg);
+}
+function updateAdminUi() {
+  const loggedIn = isAdminLoggedIn();
+  document.body.classList.toggle("admin-logged-in", loggedIn);
+  const status = document.getElementById("adminStatus");
+  const loginBtn = document.getElementById("adminLoginBtn");
+  if (status) status.textContent = loggedIn ? "관리자 모드" : "조회 전용";
+  if (loginBtn) loginBtn.style.display = loggedIn ? "none" : "inline-block";
+}
+function openAdminLogin() {
+  setAuthError("adminLoginError", "");
+  document.getElementById("adminPassword").value = "";
+  document.getElementById("adminLoginOverlay").classList.add("open");
+  setTimeout(() => document.getElementById("adminPassword")?.focus(), 50);
+}
+function closeAdminLogin() { document.getElementById("adminLoginOverlay").classList.remove("open"); }
+function openPasswordModal() {
+  if (!isAdminLoggedIn()) return openAdminLogin();
+  setAuthError("passwordChangeError", "");
+  ["currentAdminPassword","newAdminPassword","confirmAdminPassword"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("passwordOverlay").classList.add("open");
+}
+function closePasswordModal() { document.getElementById("passwordOverlay").classList.remove("open"); }
+function logoutAdmin() {
+  adminToken = null;
+  localStorage.removeItem("skillMatrixAdminToken");
+  updateAdminUi();
+  showToast("관리자 로그아웃되었습니다.");
+}
+async function adminApi(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(adminToken ? { "Authorization": `Bearer ${adminToken}` } : {})
+    },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401 && path !== "/api/admin/login") logoutAdmin();
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return data;
+}
+async function submitAdminLogin() {
+  try {
+    setAuthError("adminLoginError", "");
+    const username = document.getElementById("adminUser").value.trim();
+    const password = document.getElementById("adminPassword").value;
+    const data = await adminApi("/api/admin/login", { username, password });
+    adminToken = data.token;
+    localStorage.setItem("skillMatrixAdminToken", adminToken);
+    updateAdminUi();
+    closeAdminLogin();
+    showToast("관리자 로그인 완료");
+  } catch (err) {
+    setAuthError("adminLoginError", err.message || "Login failed.");
+  }
+}
+async function submitPasswordChange() {
+  try {
+    setAuthError("passwordChangeError", "");
+    const currentPassword = document.getElementById("currentAdminPassword").value;
+    const newPassword = document.getElementById("newAdminPassword").value;
+    const confirmPassword = document.getElementById("confirmAdminPassword").value;
+    if (newPassword.length < 8) throw new Error("New password must be at least 8 characters.");
+    if (newPassword !== confirmPassword) throw new Error("New password confirmation does not match.");
+    await adminApi("/api/admin/change-password", { currentPassword, newPassword });
+    closePasswordModal();
+    showToast("비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.");
+    logoutAdmin();
+  } catch (err) {
+    setAuthError("passwordChangeError", err.message || "Password change failed.");
+  }
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  updateAdminUi();
   // Restore version badge from localStorage
   const savedVersion = localStorage.getItem("skillMatrixVersion");
   const vEl = document.getElementById("fileVersion");
@@ -1031,9 +1196,6 @@ async function refreshHistoryModal() {
     <td>${escHtml(levelLabels[h.level] || `Level ${h.level}`)}</td>
     <td class="center">${h.acquired_date ? formatDate(h.acquired_date) : "—"}</td>
     <td style="font-family:monospace;font-size:0.8rem">${escHtml(h.test_report_number || "—")}</td>
-    <td class="center">
-      <button class="hist-del-btn" onclick="deleteHistoryRow('${h.id}', ${h.level})">✕</button>
-    </td>
   </tr>`).join("");
 
   document.getElementById("modalContent").innerHTML = `
@@ -1042,7 +1204,6 @@ async function refreshHistoryModal() {
         <th class="center" style="width:60px">Level</th><th>Description</th>
         <th class="center" style="width:110px">Acquired Date</th>
         <th>Test Report No.</th>
-        <th class="center" style="width:50px"></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
@@ -1628,7 +1789,13 @@ async function loadStats() {
 
 // ── Excel Upload ──────────────────────────────────────────────────────────────
 
-function uploadExcel() { document.getElementById("excelFileInput").click(); }
+function uploadExcel() {
+  if (!isAdminLoggedIn()) {
+    openAdminLogin();
+    return;
+  }
+  document.getElementById("excelFileInput").click();
+}
 function closeUploadModal() {
   document.getElementById("uploadOverlay").classList.remove("open");
   document.getElementById("excelFileInput").value = "";
@@ -1763,108 +1930,50 @@ function setUploadStep(stepEl, state, text) {
 }
 
 async function uploadToSupabase(parsed, version) {
-  const overlay = document.getElementById("uploadOverlay");
+  if (!isAdminLoggedIn()) {
+    throw new Error("Admin login required for Excel upload.");
+  }
+
   const stepsEl = document.getElementById("uploadSteps");
   const resultEl = document.getElementById("uploadResult");
   const closeBtn = document.getElementById("uploadCloseBtn");
 
-  const steps = ["persons","regulations","levels","history"];
-  const icons = { persons:"👤", regulations:"📋", levels:"🏆", history:"📅" };
+  const steps = ["parse","server","reload"];
+  const icons = { parse:"📄", server:"🔐", reload:"🔄" };
   stepsEl.innerHTML = steps.map(s => `
     <div class="upload-step" id="step-${s}">
       <span class="step-icon">${icons[s]}</span>
       <span class="step-text">${s.charAt(0).toUpperCase()+s.slice(1)}…</span>
     </div>`).join("");
 
-  // ── 1. Upsert persons ──────────────────────────────────────────────
-  setUploadStep(document.getElementById("step-persons"), "active", `Syncing ${parsed.persons.length} persons…`);
-  const { data: personRows, error: pErr } = await db.from("persons")
-    .upsert(parsed.persons.map(n => ({ name: n })), { onConflict:"name" })
-    .select("id, name");
-  if (pErr) throw new Error("persons: " + pErr.message);
+  setUploadStep(document.getElementById("step-parse"), "done",
+    `✓ Parsed ${parsed.persons.length} persons, ${parsed.regs.length} regulations, ${parsed.levels.length} skill levels`);
+  setUploadStep(document.getElementById("step-server"), "active", "Uploading through secure admin API…");
 
-  const nameToId = {};
-  personRows.forEach(p => nameToId[p.name] = p.id);
+  const response = await adminApi("/api/admin/upload", { parsed, version });
+  const counts = response.counts || {};
+  setUploadStep(document.getElementById("step-server"), "done", "✓ Database updated by admin API");
 
-  // Delete persons no longer in the Excel
-  const keepNames = parsed.persons;
-  const { data: allDbPersons } = await db.from("persons").select("id, name");
-  const toDelete = (allDbPersons || []).filter(p => !keepNames.includes(p.name));
-  for (const p of toDelete) {
-    await db.from("persons").delete().eq("id", p.id);
-    delete nameToId[p.name];
-  }
-  setUploadStep(document.getElementById("step-persons"), "done",
-    `✓ ${parsed.persons.length} persons synced${toDelete.length ? ` (${toDelete.length} removed)` : ""}`);
-
-  // ── 2. Upsert regulations ──────────────────────────────────────────
-  setUploadStep(document.getElementById("step-regulations"), "active", `Uploading ${parsed.regs.length} regulations…`);
-  const regUpsertData = parsed.regs.map(r => ({
-    vehicle_type: r.vtype, row_index: r.row_index,
-    subject: r.subject, regulatory_act: r.regulatory_act, un_regulation: r.un_regulation
-  }));
-  const BATCH = 50;
-  const keyToId = {};
-  for (let i = 0; i < regUpsertData.length; i += BATCH) {
-    const { data: regRows, error: rErr } = await db.from("regulations")
-      .upsert(regUpsertData.slice(i, i+BATCH), { onConflict:"vehicle_type,row_index" })
-      .select("id, vehicle_type, row_index");
-    if (rErr) throw new Error("regulations: " + rErr.message);
-    regRows.forEach(r => keyToId[`${r.vehicle_type}|${r.row_index}`] = r.id);
-  }
-  setUploadStep(document.getElementById("step-regulations"), "done", `✓ ${parsed.regs.length} regulations uploaded`);
-
-  // ── 3. Replace skill_levels ────────────────────────────────────────
-  setUploadStep(document.getElementById("step-levels"), "active", `Uploading ${parsed.levels.length} skill levels…`);
-  await db.from("skill_levels").delete().neq("id","00000000-0000-0000-0000-000000000000");
-  const lvlData = parsed.levels
-    .filter(l => nameToId[l.person] && keyToId[l.regKey])
-    .map(l => ({
-      person_id: nameToId[l.person], regulation_id: keyToId[l.regKey],
-      current_level: l.level
-    }));
-  for (let i = 0; i < lvlData.length; i += BATCH) {
-    const { error: lErr } = await db.from("skill_levels").insert(lvlData.slice(i, i+BATCH));
-    if (lErr) throw new Error("skill_levels: " + lErr.message);
-  }
-  setUploadStep(document.getElementById("step-levels"), "done", `✓ ${lvlData.length} skill levels uploaded`);
-
-  // ── 4. Replace skill_history ───────────────────────────────────────
-  setUploadStep(document.getElementById("step-history"), "active", `Uploading ${parsed.history.length} history records…`);
-  await db.from("skill_history").delete().gte("created_at","1900-01-01");
-  const histData = parsed.history
-    .filter(h => nameToId[h.person] && keyToId[h.regKey])
-    .map(h => ({
-      person_id: nameToId[h.person], regulation_id: keyToId[h.regKey],
-      level: h.level, acquired_date: h.acquired_date, test_report_number: h.test_report_number
-    }));
-  for (let i = 0; i < histData.length; i += BATCH) {
-    const { error: hErr } = await db.from("skill_history").insert(histData.slice(i, i+BATCH));
-    if (hErr) throw new Error("skill_history: " + hErr.message);
-  }
-  setUploadStep(document.getElementById("step-history"), "done", `✓ ${histData.length} history records uploaded`);
-
-  // ── Done ──────────────────────────────────────────────────────────
-  globalRegsCache = null; // invalidate cache so next search gets fresh data
-  viewRegsCache   = {};
+  setUploadStep(document.getElementById("step-reload"), "active", "Reloading dashboard data…");
+  globalRegsCache = null;
+  viewRegsCache = {};
+  statsLoaded = false;
   if (version) {
     localStorage.setItem("skillMatrixVersion", version);
     const vEl = document.getElementById("fileVersion");
     if (vEl) vEl.textContent = version;
   }
+  await init();
+  setUploadStep(document.getElementById("step-reload"), "done", "✓ Dashboard reloaded");
+
   document.getElementById("uploadTitle").textContent = "Upload Complete ✅";
   resultEl.innerHTML = `
-    <strong>${parsed.persons.length}</strong> persons &nbsp;·&nbsp;
-    <strong>${parsed.regs.length}</strong> regulations &nbsp;·&nbsp;
-    <strong>${lvlData.length}</strong> skill levels &nbsp;·&nbsp;
-    <strong>${histData.length}</strong> history records`;
+    <strong>${counts.persons ?? parsed.persons.length}</strong> persons &nbsp;·&nbsp;
+    <strong>${counts.regulations ?? parsed.regs.length}</strong> regulations &nbsp;·&nbsp;
+    <strong>${counts.skillLevels ?? parsed.levels.length}</strong> skill levels &nbsp;·&nbsp;
+    <strong>${counts.history ?? parsed.history.length}</strong> history records`;
   resultEl.style.display = "block";
   closeBtn.style.display = "inline-block";
-
-  // Reset caches and reload
-  viewRegsCache = {};
-  statsLoaded   = false;
-  await init();
 }
 
 async function handleFileSelect(event) {

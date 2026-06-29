@@ -1,0 +1,13 @@
+{
+  "name": "skill-matrix-atbs",
+  "version": "1.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node tests/admin-utils.test.js",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.86.0"
+  }
+}
